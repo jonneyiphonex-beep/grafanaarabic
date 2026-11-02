@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bwmarrin/snowflake"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/metadata"
@@ -486,6 +485,13 @@ func (b *batchRunner) recvLoop() {
 			return
 		}
 
+		if err := validateBulkBlobInput(req); err != nil {
+			if !b.sendResult(batchStreamResult{err: err, rollback: true}) {
+				return
+			}
+			return
+		}
+
 		key := req.Key
 		k := NSGR(key)
 		checker, ok := b.checker[k]
@@ -585,7 +591,7 @@ func (x *bulkRV) next(obj metav1.Object) int64 {
 	// so that the snowflake ↔ microRV roundtrip (SnowflakeFromRV / RVFromSnowflake)
 	// is lossless.
 	// TODO: remove when backwards compatibility is no longer needed
-	shift := snowflake.NodeBits + snowflake.StepBits
+	shift := resourceVersionTimestampShift
 	subMs := base & ((1 << shift) - 1)
 	if subMs >= 999 {
 		base = ((base >> shift) + 1) << shift

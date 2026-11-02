@@ -8,18 +8,17 @@ import { canAccessPluginPage, usePluginBridge } from 'app/features/alerting/unif
 import { SupportedPlugin } from 'app/features/alerting/unified/types/pluginBridges';
 
 import { HOME_CARD_MAX_ITEMS } from './constants';
-import { type IncidentFilterSelection, decodeIncidentFilter } from './incidentFilter';
+import { type FilterSelection, resolveFilterScope } from './filterSelection';
 
 export type IncidentsData = ReturnType<typeof useIncidents>;
 
 /**
- * All data fetching and derived state for the homepage Active incidents view,
- * shared between the old-layout card and the redesigned tabs.
+ * All data fetching and derived state for the homepage Active incidents view.
  *
  * When `selectedFilter` names a label value, incidents are filtered to that
  * value; the default scope fetches every active incident.
  */
-export function useIncidents(selectedFilter: IncidentFilterSelection = '') {
+export function useIncidents(selectedFilter: FilterSelection = '') {
   const { installed, loading: pluginLoading, settings } = usePluginBridge(SupportedPlugin.Irm);
   const pluginId = SupportedPlugin.Irm;
 
@@ -30,7 +29,10 @@ export function useIncidents(selectedFilter: IncidentFilterSelection = '') {
   // /incidents?declare=new (IRM's declare flow), and canAccessPluginPage ignores the query string.
   const canDeclare = settings ? canAccessPluginPage(settings, createBridgeURL(pluginId, '/incidents/declare')) : false;
 
-  const filter = decodeIncidentFilter(selectedFilter);
+  const filterScope = resolveFilterScope(selectedFilter);
+  // Incident label fields are keyed by slug.
+  const filter =
+    filterScope.kind === 'label' ? { slug: filterScope.label.key, value: filterScope.label.value } : undefined;
 
   // Skipped until the plugin probe confirms availability, so the hook can run unconditionally
   // in callers that render even when incidents are unavailable.
@@ -49,7 +51,6 @@ export function useIncidents(selectedFilter: IncidentFilterSelection = '') {
 
   const loading = pluginLoading || (isFetching && currentData === undefined);
   const count = incidents.length;
-  const hasIncidents = count > 0;
   // A 404 from the Incident backend means this org has no incident record yet (plugin installed but not
   // onboarded, or no incident ever created) — that's "no active incidents", not a failure. Every other
   // error (401/403/5xx/network) is genuine and surfaced to the user.
@@ -71,9 +72,8 @@ export function useIncidents(selectedFilter: IncidentFilterSelection = '') {
     displayed,
     count,
     hasMore,
-    hasIncidents,
-    // Echoed back so the card can scope its empty message to the filtered value.
-    filter,
+    // Echoed back so the card can scope its empty message to the picked value.
+    filterScope,
     enabled: pluginLoading ? undefined : !!installed,
     loading,
     error: loadError,

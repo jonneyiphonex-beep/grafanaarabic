@@ -40,7 +40,6 @@ import { VizPanelSubHeader } from '../../scene/VizPanelSubHeader';
 import { type AutoGridItem } from '../../scene/layout-auto-grid/AutoGridItem';
 import { type DashboardGridItem } from '../../scene/layout-default/DashboardGridItem';
 import { PanelTimeRange } from '../../scene/panel-timerange/PanelTimeRange';
-import { getPlanningPanelData } from '../../scene/planningSampleData';
 import { setDashboardPanelContext } from '../../scene/setDashboardPanelContext';
 import { pluginTransformationsEnabled } from '../../scene/systemTransformations';
 import { type DashboardLayoutManager } from '../../scene/types/DashboardLayoutManager';
@@ -126,10 +125,9 @@ export function buildVizPanelState(
     titleItems,
     $behaviors: [],
     _UNSAFE_clearPreviousFieldValues: true,
-    // Spread before options/fieldConfig below: this only supplies a synthetic $data series so a
-    // query-less placeholder has something to render. The spec's own options/fieldConfig are the
-    // assistant's planned visualization settings and must win, not be clobbered by the sample's.
-    ...(buildOptions.withoutQueries ? getPlanningPanelData(panel.spec.title, panel.spec.vizConfig.group) : {}),
+    // The spec's own options/fieldConfig are the assistant's planned visualization settings
+    // and must win, not be clobbered by the sample's. RENDER_PLAN supplies synthetic $data
+    // for query-less previews; keeping samples there also avoids loading them for real dashboards.
     options,
     fieldConfig: transformMappingsToV1(panel.spec.vizConfig.spec.fieldConfig),
   };
@@ -167,9 +165,7 @@ export function buildVizPanel(panel: PanelKind, id?: number, buildOptions: Build
  * and therefore require a DashboardScene ancestor.
  */
 function addDashboardPanelChrome(vizPanelState: VizPanelState): void {
-  vizPanelState.headerActions = new VizPanelHeaderActions({
-    hideGroupByAction: !config.featureToggles.dashboardUnifiedDrilldownControls,
-  });
+  vizPanelState.headerActions = new VizPanelHeaderActions({});
   vizPanelState.subHeader = new VizPanelSubHeader({});
   vizPanelState.extendPanelContext = setDashboardPanelContext;
 
